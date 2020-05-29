@@ -1,0 +1,44 @@
+--157 records will be updated for Grace Period 3 to 15
+use [RIMDB]
+go
+
+declare @tStore int,
+@tRentalDueDate as date,
+@tReason as varchar(20)='WR6059-20-8946',
+@tComment as varchar(400)='update Rental Grace Periods',
+@tUser as varchar(30)='rcellarius',
+@tNewGracePeriod as int
+
+declare duedatecursor cursor Fast_Forward For
+SELECT distinct   rentalitem.RentalReturnDueDate, RentalTransaction.Store, StoreNewGracePeriod20200325.Newgraceperiod 
+					FROM dbo.RentalItem 	
+					INNER JOIN dbo.RentalTransaction  ON dbo.RentalTransaction.TransID = dbo.RentalItem.TransID  
+					INNER JOIN dbo.Patron ON dbo.Patron.PatronID = dbo.RentalTransaction.PatronID
+					JOIN StoreNewGracePeriod20200325 ON DBO.RentalTransaction.Store=StoreNewGracePeriod20200325.StoreNumber
+					right join PatronChannel on PatronChannel.PatronID = Patron .PatronID  
+					and RentalTransaction.PatronChannelID = PatronChannel.PatronChannelID
+					WHERE RentalItem.ItemStatus in (100,102)	
+					and rentalitem.InsertDate>='2020/4/25'
+					and RentalTransaction.Store  IN(SELECT StoreNumber FROM StoreNewGracePeriod20200325)
+					and RentalItem.RentalReturnGracePeriod=3
+					ORDER BY RentalTransaction.Store
+
+Open duedatecursor 
+Fetch Next From duedatecursor into @tRentalDueDate,@tStore,@tNewGracePeriod
+while @@FETCH_STATUS=0
+BEGIN
+
+--SELECT @tStore,@tRentalDueDate,@tRentalDueDate,@tReason,@tComment,@tUser,@tNewGracePeriod
+exec  [dbo].[Proc_ChangeSchoolRentalReturnDueDate] 
+@Store=@tStore,
+@SelectedDate=@tRentalDueDate,
+@NewRentalReturnDueDate=@tRentalDueDate,
+@Reason=@tReason,
+@Comment=@tComment,
+@User=@tUser,
+@gracePeriod=@tNewGracePeriod
+
+Fetch Next From duedatecursor into @tRentalDueDate,@tStore,@tNewGracePeriod
+END
+close duedatecursor
+deallocate duedatecursor					
